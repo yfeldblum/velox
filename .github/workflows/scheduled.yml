@@ -85,7 +85,7 @@ jobs:
     name: Build
     # prevent errors when forks ff their main branch
     if: ${{ github.repository == 'facebookincubator/velox' }}
-    runs-on: 16-core
+    runs-on: 16-core-ubuntu
     container: ghcr.io/facebookincubator/velox-dev:centos8
     timeout-minutes: 120
     env:
@@ -307,6 +307,13 @@ jobs:
         with:
           name: window
           path: velox/_build/debug/velox/functions/prestosql/fuzzer/velox_window_fuzzer_test
+          retention-days: "${{ env.RETENTION }}"
+
+      - name: Upload row number fuzzer
+        uses: actions/upload-artifact@v4
+        with:
+          name: row_number
+          path: velox/_build/debug//velox/exec/tests/velox_row_number_fuzzer_test
           retention-days: "${{ env.RETENTION }}"
 
   presto-fuzzer-run:
@@ -655,6 +662,30 @@ jobs:
             name: exchange-fuzzer-failure-artifacts
             path: |
               /tmp/exchange_fuzzer_repro
+
+  row-number-fuzzer-run:
+    name: RowNumber Fuzzer
+    runs-on: ubuntu-latest
+    container: ghcr.io/facebookincubator/velox-dev:centos8
+    needs: compile
+    timeout-minutes: 120
+    steps:
+
+      - name: Download row number fuzzer
+        uses: actions/download-artifact@v4
+        with:
+          name: row_number
+
+      - name: Run RowNumber Fuzzer
+        run: |
+          cat /proc/sys/vm/max_map_count
+          chmod +x velox_row_number_fuzzer_test
+          ./velox_row_number_fuzzer_test \
+                --seed ${RANDOM} \
+                --duration_sec ${{ env.DURATION }} \
+                --logtostderr=1 \
+                --minloglevel=1 \
+            && echo -e "\n\Row number fuzzer run finished successfully."
 
   presto-java-aggregation-fuzzer-run:
     name: Aggregation Fuzzer with Presto as source of truth

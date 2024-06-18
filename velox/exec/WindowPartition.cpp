@@ -263,20 +263,22 @@ void WindowPartition::updateKRangeFrameBounds(
     const vector_size_t* rawPeerBounds,
     vector_size_t* rawFrameBounds) const {
   column_index_t orderByColumn = sortKeyInfo_[0].first;
-  RowColumn frameRowColumn = columns_[frameColumn];
+  column_index_t mappedFrameColumn = inputMapping_[frameColumn];
 
   vector_size_t start = 0;
   vector_size_t end;
   for (auto i = 0; i < numRows; i++) {
     auto currentRow = startRow + i;
-    bool frameIsNull = RowContainer::isNullAt(
-        partition_[currentRow],
-        frameRowColumn.nullByte(),
-        frameRowColumn.nullMask());
 
-    // For NULL values, CURRENT ROW semantics apply. So get frame bound from
-    // peer buffer.
-    if (frameIsNull) {
+    // If the frame is NULL or 0 preceding or 0 following then the current row
+    // has same values for order by and frame column. In that case
+    // the bound matches the peer row for this row.
+    if (data_->compare(
+            partition_[currentRow],
+            partition_[currentRow],
+            orderByColumn,
+            mappedFrameColumn,
+            flags) == 0) {
       rawFrameBounds[i] = rawPeerBounds[i];
     } else {
       // If the search is for a preceding bound then rows between
@@ -295,7 +297,7 @@ void WindowPartition::updateKRangeFrameBounds(
           end,
           currentRow,
           orderByColumn,
-          inputMapping_[frameColumn],
+          mappedFrameColumn,
           flags);
     }
   }
